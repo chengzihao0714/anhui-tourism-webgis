@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安徽省旅游地图 WebGIS 应用</title>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/css/main.css">
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        /* 页眉区域 */
+        header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        
+        header nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0 0;
+        }
+        
+        header nav ul li {
+            display: inline-block;
+            margin: 0 15px;
+        }
+        
+        header nav ul li a {
+            color: white;
+            text-decoration: none;
+            font-size: 16px;
+            transition: color 0.3s;
+        }
+        
+        header nav ul li a:hover {
+            color: #18bc9c;
+        }
+        
+        /* 主内容区域 */
+        .main-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+        }
+        
+        /* 地图区域 */
+        #mapViewNode {
+            flex: 1;
+            width: 100%;
+        }
+        
+        /* 底图库区域 */
+        #basemapGallery {
+            width: 220px;
+            background-color: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            padding: 15px;
+            overflow-y: auto;
+            z-index: 1;
+        }
+        
+        #basemapGallery h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .basemap-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+            border: 1px solid #eee;
+        }
+        
+        .basemap-item:hover {
+            background-color: #f8f9fa;
+            border-color: #18bc9c;
+        }
+        
+        .basemap-item.active {
+            background-color: #e8f8f5;
+            border-color: #18bc9c;
+            font-weight: bold;
+        }
+        
+        .basemap-thumbnail {
+            width: 100%;
+            height: 80px;
+            background-size: cover;
+            background-position: center;
+            margin-bottom: 8px;
+            border-radius: 3px;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            
+            #basemapGallery {
+                width: 100%;
+                height: auto;
+                max-height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>安徽省旅游地图 WebGIS 应用</h1>
+        <nav>
+            <ul>
+                <li><a href="#">首页</a></li>
+                <li><a href="#">景点浏览</a></li>
+                <li><a href="#">旅游路线</a></li>
+                <li><a href="#">关于系统</a></li>
+            </ul>
+        </nav>
+    </header>
+    
+    <div class="main-container">
+        <div id="mapViewNode"></div>
+        <aside id="basemapGallery">
+            <h3>底图切换</h3>
+            <div class="basemap-item active" data-basemap="streets-navigation-vector">
+                <div class="basemap-thumbnail" style="background-image: url('https://www.arcgis.com/sharing/rest/content/items/3d52817a120b4776a5f7b7f1f5ac3211/resources/thumbnail-1584645208644.jpeg')"></div>
+                <div>街道地图</div>
+            </div>
+            <div class="basemap-item" data-basemap="satellite">
+                <div class="basemap-thumbnail" style="background-image: url('https://www.arcgis.com/sharing/rest/content/items/702331a6013a4b1d9a7c6f6f2f9d9e9b/resources/thumbnail-1584645208644.jpeg')"></div>
+                <div>卫星影像</div>
+            </div>
+            <div class="basemap-item" data-basemap="topo-vector">
+                <div class="basemap-thumbnail" style="background-image: url('https://www.arcgis.com/sharing/rest/content/items/7dc6cea0b1764a1f9af2e679f642f0f5/resources/thumbnail-1584645208644.jpeg')"></div>
+                <div>地形地图</div>
+            </div>
+            <div class="basemap-item" data-basemap="osm">
+                <div class="basemap-thumbnail" style="background-image: url('https://www.arcgis.com/sharing/rest/content/items/358ec1e2267e4b9a9c3e5a0a3b3a0f8a/resources/thumbnail-1584645208644.jpeg')"></div>
+                <div>OpenStreetMap</div>
+            </div>
+        </aside>
+    </div>
+
+    <script src="https://js.arcgis.com/4.28/"></script>
+    <script>
+        require([
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer",
+            "esri/widgets/ScaleBar",
+            "esri/widgets/Legend",
+            "esri/widgets/Search",
+            "esri/widgets/LayerList",
+            "esri/widgets/Expand",
+            "esri/Basemap",
+            "esri/layers/TileLayer"
+        ], function(
+            Map, MapView, FeatureLayer, 
+            ScaleBar, Legend, Search, 
+            LayerList, Expand, Basemap, TileLayer
+        ) {
+            // 初始化地图
+            const map = new Map({
+                basemap: "streets-navigation-vector"
+            });
+            
+            // 添加安徽省旅游景点图层（使用ArcGIS Online发布的图层）
+            const scenicSpotsLayer = new FeatureLayer({
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/China_Tourist_Attractions/FeatureServer/0",
+                outFields: ["*"],
+                popupTemplate: {
+                    title: "{NAME}",
+                    content: [{
+                        type: "fields",
+                        fieldInfos: [
+                            { fieldName: "NAME", label: "景点名称" },
+                            { fieldName: "ADDRESS", label: "地址" },
+                            { fieldName: "DESCRIPTION", label: "描述" },
+                            { fieldName: "LEVEL", label: "等级" }
+                        ]
+                    }]
+                }
+            });
+            map.add(scenicSpotsLayer);
+            
+            // 添加安徽省边界图层
+            const anhuiBoundaryLayer = new FeatureLayer({
+                url: "https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/China_Provinces/FeatureServer/0",
+                definitionExpression: "NAME = 'Anhui'",
+                opacity: 0.5
+            });
+            map.add(anhuiBoundaryLayer);
+            
+            // 初始化视图
+            const view = new MapView({
+                container: "mapViewNode",
+                map: map,
+                center: [117.2, 31.8], // 安徽省中心坐标
+                zoom: 7,
+                constraints: {
+                    minZoom: 6,
+                    maxZoom: 18
+                }
+            });
+            
+            // 添加比例尺控件
+            const scaleBar = new ScaleBar({
+                view: view,
+                unit: "metric"
+            });
+            view.ui.add(scaleBar, {
+                position: "bottom-left"
+            });
+            
+            // 添加图例控件
+            const legend = new Legend({
+                view: view
+            });
+            
+            const legendExpand = new Expand({
+                view: view,
+                content: legend,
+                expandIconClass: "esri-icon-legend",
+                expandTooltip: "图例"
+            });
+            view.ui.add(legendExpand, "top-right");
+            
+            // 添加搜索控件
+            const searchWidget = new Search({
+                view: view,
+                includeDefaultSources: false,
+                sources: [{
+                    layer: scenicSpotsLayer,
+                    searchFields: ["NAME", "ADDRESS"],
+                    displayField: "NAME",
+                    exactMatch: false,
+                    outFields: ["*"],
+                    placeholder: "搜索景点名称或地址",
+                    name: "安徽旅游景点"
+                }],
+                popupEnabled: true
+            });
+            view.ui.add(searchWidget, {
+                position: "top-right",
+                index: 0
+            });
+            
+            // 添加图层列表控件
+            const layerList = new LayerList({
+                view: view,
+                listItemCreatedFunction: function(event) {
+                    const item = event.item;
+                    if (item.layer === scenicSpotsLayer) {
+                        item.title = "安徽旅游景点";
+                    } else if (item.layer === anhuiBoundaryLayer) {
+                        item.title = "安徽省边界";
+                    }
+                }
+            });
+            
+            const layerListExpand = new Expand({
+                view: view,
+                content: layerList,
+                expandIconClass: "esri-icon-layers",
+                expandTooltip: "图层列表"
+            });
+            view.ui.add(layerListExpand, "top-right");
+            
+            // 底图切换功能
+            document.querySelectorAll(".basemap-item").forEach(item => {
+                item.addEventListener("click", function() {
+                    const basemapName = this.getAttribute("data-basemap");
+                    
+                    // 更新活动状态
+                    document.querySelectorAll(".basemap-item").forEach(el => {
+                        el.classList.remove("active");
+                    });
+                    this.classList.add("active");
+                    
+                    // 切换底图
+                    map.basemap = basemapName;
+                });
+            });
+            
+            // 地图加载完成后的事件
+            view.when(() => {
+                console.log("地图加载完成");
+            });
+        });
+    </script>
+</body>
+</html>
